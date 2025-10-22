@@ -134,3 +134,114 @@
     err-not-found
   )
 )
+
+;; Public functions
+;; #[allow(unchecked_data)]
+(define-public (register-model (name (string-ascii 100)) (model-hash (string-ascii 64)))
+  (let
+    (
+      (model-id (var-get next-model-id))
+    )
+    (map-set models
+      { model-id: model-id }
+      {
+        owner: tx-sender,
+        name: name,
+        model-hash: model-hash,
+        registered-block: stacks-block-height,
+        latest-compliance-status: compliance-pending,
+        total-audits: u0
+      }
+    )
+    (var-set next-model-id (+ model-id u1))
+    (ok model-id)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (certify-auditor (auditor principal) (name (string-ascii 100)) (certification-hash (string-ascii 64)))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (asserts! (is-none (get-auditor auditor)) err-already-exists)
+    
+    (map-set auditors
+      { auditor: auditor }
+      {
+        name: name,
+        certification-hash: certification-hash,
+        certified: true,
+        certified-block: stacks-block-height,
+        total-audits-conducted: u0
+      }
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (revoke-auditor-certification (auditor principal))
+  (let
+    (
+      (auditor-data (unwrap! (get-auditor auditor) err-not-found))
+    )
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    (map-set auditors
+      { auditor: auditor }
+      (merge auditor-data { certified: false })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (submit-audit 
+  (model-id uint) 
+  (findings-hash (string-ascii 64))
+  (compliance-status uint)
+  (severity-level uint))
+  (let
+    (
+      (model-data (unwrap! (get-model model-id) err-not-found))
+      (auditor-data (unwrap! (get-auditor tx-sender) err-not-certified))
+      (audit-id (var-get next-audit-id))
+      (current-audit-index (get total-audits model-data))
+    )
+    (asserts! (get certified auditor-data) err-not-certified)
+    (asserts! (<= compliance-status compliance-conditional) err-invalid-params)
+    (asserts! (<= severity-level u5) err-invalid-params)
+    
+    (map-set audits
+      { audit-id: audit-id }
+      {
+        model-id: model-id,
+        auditor: tx-sender,
+        audit-block: stacks-block-height,
+        findings-hash: findings-hash,
+        compliance-status: compliance-status,
+        severity-level: severity-level
+      }
+    )
+    
+    (map-set model-audits
+      { model-id: model-id, audit-index: current-audit-index }
+      { audit-id: audit-id }
+    )
+    
+    (map-set models
+      { model-id: model-id }
+      (merge model-data {
+        latest-compliance-status: compliance-status,
+        total-audits: (+ current-audit-index u1)
+      })
+    )
+    
+    (map-set auditors
+      { auditor: tx-sender }
+      (merge auditor-data { total-audits-conducted: (+ (get total-audits-conducted auditor-data) u1) })
+    )
+    
+    (var-set next-audit-id (+ audit-id u1))
+    (ok audit-id)
+  )
+)
