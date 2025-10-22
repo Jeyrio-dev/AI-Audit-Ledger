@@ -74,3 +74,63 @@
   { compliant: bool }
 )
 
+;; Read-only functions
+(define-read-only (get-model (model-id uint))
+  (map-get? models { model-id: model-id })
+)
+
+(define-read-only (get-auditor (auditor principal))
+  (map-get? auditors { auditor: auditor })
+)
+
+(define-read-only (get-audit (audit-id uint))
+  (map-get? audits { audit-id: audit-id })
+)
+
+(define-read-only (is-certified-auditor (auditor principal))
+  (match (get-auditor auditor)
+    auditor-data (ok (get certified auditor-data))
+    (ok false)
+  )
+)
+
+(define-read-only (get-model-audit-history (model-id uint) (audit-index uint))
+  (match (map-get? model-audits { model-id: model-id, audit-index: audit-index })
+    audit-ref (get-audit (get audit-id audit-ref))
+    none
+  )
+)
+
+(define-read-only (get-latest-compliance (model-id uint))
+  (match (get-model model-id)
+    model-data (ok (get latest-compliance-status model-data))
+    (err err-not-found)
+  )
+)
+
+(define-read-only (get-auditor-statistics (auditor principal))
+  (match (get-auditor auditor)
+    auditor-data (ok {
+      name: (get name auditor-data),
+      certified: (get certified auditor-data),
+      certified-block: (get certified-block auditor-data),
+      total-audits-conducted: (get total-audits-conducted auditor-data),
+      certification-hash: (get certification-hash auditor-data)
+    })
+    err-not-found
+  )
+)
+
+(define-read-only (get-model-compliance-summary (model-id uint))
+  (match (get-model model-id)
+    model-data (ok {
+      owner: (get owner model-data),
+      name: (get name model-data),
+      registered-block: (get registered-block model-data),
+      latest-compliance-status: (get latest-compliance-status model-data),
+      total-audits: (get total-audits model-data),
+      model-hash: (get model-hash model-data)
+    })
+    err-not-found
+  )
+)
