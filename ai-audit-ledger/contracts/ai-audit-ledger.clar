@@ -19,3 +19,58 @@
 (define-data-var next-model-id uint u0)
 (define-data-var next-audit-id uint u0)
 
+;; Data Maps
+(define-map models
+  { model-id: uint }
+  {
+    owner: principal,
+    name: (string-ascii 100),
+    model-hash: (string-ascii 64),
+    registered-block: uint,
+    latest-compliance-status: uint,
+    total-audits: uint
+  }
+)
+
+(define-map auditors
+  { auditor: principal }
+  {
+    name: (string-ascii 100),
+    certification-hash: (string-ascii 64),
+    certified: bool,
+    certified-block: uint,
+    total-audits-conducted: uint
+  }
+)
+
+(define-map audits
+  { audit-id: uint }
+  {
+    model-id: uint,
+    auditor: principal,
+    audit-block: uint,
+    findings-hash: (string-ascii 64),
+    compliance-status: uint,
+    severity-level: uint
+  }
+)
+
+(define-map model-audits
+  { model-id: uint, audit-index: uint }
+  { audit-id: uint }
+)
+
+(define-map compliance-requirements
+  { requirement-id: uint }
+  {
+    name: (string-ascii 100),
+    description-hash: (string-ascii 64),
+    active: bool
+  }
+)
+
+(define-map audit-requirements
+  { audit-id: uint, requirement-id: uint }
+  { compliant: bool }
+)
+
