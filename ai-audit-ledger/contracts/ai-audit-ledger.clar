@@ -245,3 +245,85 @@
     (ok audit-id)
   )
 )
+
+(define-public (update-model-hash (model-id uint) (new-model-hash (string-ascii 64)))
+  (let
+    (
+      (model-data (unwrap! (get-model model-id) err-not-found))
+    )
+    (asserts! (is-eq (get owner model-data) tx-sender) err-unauthorized)
+    
+    (map-set models
+      { model-id: model-id }
+      (merge model-data { 
+        model-hash: new-model-hash,
+        latest-compliance-status: compliance-pending
+      })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (add-compliance-requirement (requirement-id uint) (name (string-ascii 100)) (description-hash (string-ascii 64)))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    (map-set compliance-requirements
+      { requirement-id: requirement-id }
+      {
+        name: name,
+        description-hash: description-hash,
+        active: true
+      }
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (record-requirement-compliance (audit-id uint) (requirement-id uint) (compliant bool))
+  (let
+    (
+      (audit-data (unwrap! (get-audit audit-id) err-not-found))
+    )
+    (asserts! (is-eq (get auditor audit-data) tx-sender) err-unauthorized)
+    (map-set audit-requirements
+      { audit-id: audit-id, requirement-id: requirement-id }
+      { compliant: compliant }
+    )
+    (ok true)
+  )
+)
+
+(define-public (transfer-model-ownership (model-id uint) (new-owner principal))
+  (let
+    (
+      (model-data (unwrap! (get-model model-id) err-not-found))
+    )
+    (asserts! (is-eq (get owner model-data) tx-sender) err-unauthorized)
+    (asserts! (not (is-eq new-owner tx-sender)) err-invalid-params)
+    
+    (map-set models
+      { model-id: model-id }
+      (merge model-data { owner: new-owner })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (deactivate-compliance-requirement (requirement-id uint))
+  (let
+    (
+      (requirement-data (unwrap! (map-get? compliance-requirements { requirement-id: requirement-id }) err-not-found))
+    )
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    (map-set compliance-requirements
+      { requirement-id: requirement-id }
+      (merge requirement-data { active: false })
+    )
+    (ok true)
+  )
+)
